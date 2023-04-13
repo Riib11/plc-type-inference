@@ -22,8 +22,9 @@ to generate this file without the comments in this block.
   , "ordered-collections"
   , "partial"
   , "prelude"
-  , "spec"
+  , "refs"
   , "transformers"
+  , "tuples"
   , "uuid"
   ]
 , packages = ./packages.dhall
