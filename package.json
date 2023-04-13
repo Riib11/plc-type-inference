@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "uuid-validate": "^0.0.3"
+  }
+}

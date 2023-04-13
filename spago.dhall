@@ -12,14 +12,17 @@ to generate this file without the comments in this block.
 -}
 { name = "my-project"
 , dependencies =
-  [ "bifunctors"
+  [ "arrays"
   , "console"
   , "effect"
+  , "either"
   , "foldable-traversable"
+  , "maybe"
   , "newtype"
   , "ordered-collections"
   , "partial"
   , "prelude"
+  , "spec"
   , "transformers"
   , "uuid"
   ]

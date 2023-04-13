@@ -2,54 +2,78 @@ module Language.PLC.Typing where
 
 import Prelude
 import Prim hiding (Type)
-import Control.Monad.Except (ExceptT, throwError)
-import Control.Monad.State (StateT, get, modify)
+import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad.Reader (ReaderT, asks, local, runReaderT)
+import Control.Monad.State (StateT, get, modify, runStateT)
 import Data.Array (elem)
+import Data.Either (Either)
 import Data.Expr (substitute)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, over, unwrap)
 import Data.Traversable (foldMap, sequence)
+import Data.Tuple (Tuple)
 import Data.UUID as UUID
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Language.PLC.Grammar (HoleId(..), Term, TermF(..), Type, TypeF(..), TypeId, TypeVar(..))
+import Effect.Console (log)
+import Language.PLC.Grammar (HoleId(..), Term, TermF(..), TermId, Type, TypeF(..), TypeId, TypeVar(..))
 
 type TypingM
-  = StateT (Map.Map HoleId Type) (ExceptT String Effect)
+  = StateT (Map.Map HoleId Type) (ReaderT TypingCtx (ExceptT String Effect))
+
+newtype TypingCtx
+  = TypingCtx (Map.Map TermId (TypingM Type))
+
+derive instance newtypeTypingCtx :: Newtype TypingCtx _
+
+-- runTypingM :: forall a. TypingM a -> Effect (Either String a)
+-- runTypingM :: forall e9 m10 a18 k19 v20. StateT (Map k19 v20) (ReaderT TypingCtx (ExceptT e9 m10)) a18 -> m10 (Either e9 (Tuple a18 (Map k19 v20)))
+runTypingM :: forall e9 m10 a18 k19 v20. StateT (Map.Map k19 v20) (ReaderT TypingCtx (ExceptT e9 m10)) a18 -> m10 (Either e9 (Tuple a18 (Map.Map k19 v20)))
+runTypingM m = runExceptT (runReaderT (runStateT m Map.empty) (TypingCtx Map.empty))
 
 -- | Annotate term with normalized types.
-annotate :: Term (Maybe Type) -> TypingM (Term Type)
+annotate :: Term Unit -> TypingM (Term Type)
 annotate t = sequence =<< annotate' t
 
 -- | Annotate term with not-yet-normalize types.
-annotate' :: Term (Maybe Type) -> TypingM (Term (TypingM Type))
-annotate' (VarTerm x Nothing) = VarTerm <$> pure x <*> freshType
+annotate' :: Term Unit -> TypingM (Term (TypingM Type))
+annotate' (VarTerm x _) = do
+  m_y <-
+    asks (Map.lookup x <<< (unwrap :: TypingCtx -> Map.Map TermId (TypingM Type)))
+      >>= case _ of
+          Nothing -> throwError $ "unknown term id: `" <> show x <> "`"
+          Just m_y -> pure m_y
+  VarTerm x <$> (normalize <$> m_y)
 
-annotate' (VarTerm x (Just y)) = pure $ VarTerm x (normalize y)
-
-annotate' (LamTerm x t) = LamTerm x <$> annotate' t
+annotate' (LamTerm x _ t) = do
+  y <- freshType
+  LamTerm x y <$> local (over TypingCtx $ Map.insert x y) (annotate' t)
 
 annotate' (AppTerm t1 t2) = AppTerm <$> annotate' t1 <*> annotate' t2
 
--- | Infer not-yet-normalize type of term.
-infer :: Term (TypingM Type) -> TypingM (TypingM Type)
-infer (VarTerm _ y) = normalize <$> y
+-- | Infer the normalized type of a term.
+infer :: Term Type -> TypingM Type
+infer t = join $ infer' (normalize <$> t)
 
-infer (LamTerm _ t) = do
-  y1 <- freshType
-  y2 <- infer t
+-- | Infer not-yet-normalize type of term.
+infer' :: Term (TypingM Type) -> TypingM (TypingM Type)
+infer' (VarTerm _ y) = normalize <$> y
+
+infer' (LamTerm _ y1 t) = do
+  y2 <- infer' t
   pure $ ArrType <$> y1 <*> y2
 
-infer (AppTerm t12 t1) = do
+infer' (AppTerm t12 t1) = do
   -- infer type of applicant
-  m_y12 <- infer t12
+  m_y12 <- infer' t12
   -- applicant must be a function type, so unify it's type with fresh funciton
   -- type
   m_y1 <- freshType
   m_y2 <- freshType
   void $ unify (ArrType <$> m_y1 <*> m_y2) m_y12
   -- infer type of t1
-  m_y1' <- infer t1
+  m_y1' <- infer' t1
   -- the type of t1 must unify with the domain of t12
   void $ unify m_y1 m_y1'
   -- output type 
@@ -62,11 +86,13 @@ unify m_y1 m_y2 = join $ unify' <$> m_y1 <*> m_y2
 -- expected, inferred
 unify' :: Type -> Type -> TypingM (TypingM Type)
 unify' (VarType (HoleIdVar h)) y = do
+  liftEffect $ log $ "unify hole `" <> show h <> "` with type `" <> show y <> "`"
   assertNonoccurs h y
   void $ modify $ Map.insert h y
   pure $ normalize y
 
 unify' y (VarType (HoleIdVar h)) = do
+  liftEffect $ log $ "unify hole `" <> show h <> "` with type `" <> show y <> "`"
   assertNonoccurs h y
   void $ modify $ Map.insert h y
   pure $ normalize y

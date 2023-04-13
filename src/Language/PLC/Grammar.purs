@@ -7,9 +7,14 @@ import Prim hiding (Type)
 import Data.Expr (class Expr, joinExpr)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
+import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Data.Traversable (class Traversable)
 import Data.UUID (UUID)
+import Effect.Ref (write)
+import Effect.Ref as Ref
+import Effect.Unsafe (unsafePerformEffect)
 import Prim as Prim
 
 -- | Type.
@@ -52,7 +57,7 @@ type Term y
 
 data TermF y
   = VarTerm TermId y
-  | LamTerm TermId (TermF y)
+  | LamTerm TermId y (TermF y)
   | AppTerm (TermF y) (TermF y)
 
 derive instance genericTermF :: Generic (TermF y) _
@@ -90,7 +95,24 @@ derive instance ordTermId :: Ord TermId
 newtype HoleId
   = HoleId UUID
 
-derive newtype instance showHoleId :: Show HoleId
+instance showHoleId :: Show HoleId where
+  show (HoleId uuid) =
+    unsafePerformEffect do
+      m <- Ref.read holeUUIDs
+      case Map.lookup uuid m of
+        Nothing -> do
+          -- if we haven't already shown this hole id, then insert into map,
+          -- where index is size of map
+          let
+            i = Map.size m
+          write (Map.insert uuid i m) holeUUIDs
+          pure $ "?" <> show i
+        Just i -> do
+          -- we've already showm this hole id, show we can use it's known index 
+          pure $ "?" <> show i
+
+holeUUIDs :: Ref.Ref (Map.Map UUID Int)
+holeUUIDs = unsafePerformEffect $ Ref.new Map.empty
 
 derive instance eqHoleId :: Eq HoleId
 
