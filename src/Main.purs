@@ -50,18 +50,17 @@ main = do
     -- log $ "sigma = " <> show sigma
     pure unit
   do
-    (y /\ sigma) <-
-      runTypingM
-        ( do
-            let
-              a = VarType $ TypeIdVar $ TypeId "A"
+    runTypingM
+      ( do
+          let
+            a = VarType $ TypeIdVar $ TypeId "A"
 
-              b = VarType $ TypeIdVar $ TypeId "B"
-            alpha <- freshType
-            join $ unify (ArrType <$> pure a <*> pure b) (ArrType <$> alpha <*> alpha)
-        )
-        >>= case _ of
-            Left err -> unsafeCrashWith err
-            Right (a /\ sigma) -> pure (a /\ sigma)
-    log $ "y  = " <> show y
-    log $ "sigma = " <> show sigma
+            b = VarType $ TypeIdVar $ TypeId "B"
+          alpha <- freshType
+          join $ unify (ArrType <$> pure a <*> pure b) (ArrType <$> alpha <*> alpha)
+      )
+      >>= case _ of
+          Left err -> log $ "typing error: " <> err
+          Right (y /\ sigma) -> do
+            log $ "y  = " <> show y
+            log $ "sigma = " <> show sigma

@@ -86,13 +86,13 @@ unify m_y1 m_y2 = join $ unify' <$> m_y1 <*> m_y2
 -- expected, inferred
 unify' :: Type -> Type -> TypingM (TypingM Type)
 unify' (VarType (HoleIdVar h)) y = do
-  liftEffect $ log $ "unify hole `" <> show h <> "` with type `" <> show y <> "`"
+  liftEffect $ log $ "[unify'] unify hole `" <> show h <> "` with type `" <> show y <> "`"
   assertNonoccurs h y
   void $ modify $ Map.insert h y
   pure $ normalize y
 
 unify' y (VarType (HoleIdVar h)) = do
-  liftEffect $ log $ "unify hole `" <> show h <> "` with type `" <> show y <> "`"
+  liftEffect $ log $ "[unify'] unify hole `" <> show h <> "` with type `" <> show y <> "`"
   assertNonoccurs h y
   void $ modify $ Map.insert h y
   pure $ normalize y
