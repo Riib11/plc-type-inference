@@ -102,13 +102,13 @@ unify' (VarType (TypeIdVar i1)) (VarType (TypeIdVar i2))
 
 -- assume types are normal, so must be neutral
 unify' (AppType y11 y12) (AppType y21 y22) = do
-  y1 <- unify' y11 y21
-  y2 <- unify' y12 y22
+  y1 <- unify (normalize y11) (normalize y21)
+  y2 <- unify (normalize y12) (normalize y22)
   map normalize $ AppType <$> y1 <*> y2
 
 unify' (ArrType y11 y12) (ArrType y21 y22) = do
-  y1 <- unify' y11 y21
-  y2 <- unify' y12 y22
+  y1 <- unify (normalize y11) (normalize y21)
+  y2 <- unify (normalize y12) (normalize y22)
   map normalize $ ArrType <$> y1 <*> y2
 
 unify' y1 y2 = throwError $ "[unify] cannot unify `" <> show y1 <> "` with `" <> show y2 <> "`"
