@@ -1,3 +1,6 @@
+-- | Grammar of the polymorphic lambda calculus with the following restrictions:
+-- | - only first-order type quantification i.e. all quantifications are over
+-- |   kind `*`
 module Language.PLC.Grammar where
 
 import Prelude
@@ -18,7 +21,7 @@ data Kind
 
 -- | Type.
 type Type
-  = TypeF
+  = TypeF TypeVar
 
 data TypeVar
   = TypeIdVar TypeId
@@ -26,8 +29,8 @@ data TypeVar
 
 data TypeF x
   = VarType x
-  | AppType (TypeF x) (TypeF x)
   | LamType TypeId (TypeF x)
+  | AppType (TypeF x) (TypeF x)
   | ArrType (TypeF x) (TypeF x)
 
 derive instance genericTypeF :: Generic (TypeF x) _
@@ -41,8 +44,8 @@ derive instance traversableTypeF :: Traversable TypeF
 instance exprTypeF :: Expr TypeF where
   mapExpr = map
   joinExpr (VarType x) = x
-  joinExpr (AppType y1 y2) = AppType (joinExpr y1) (joinExpr y2)
   joinExpr (ArrType y1 y2) = ArrType (joinExpr y1) (joinExpr y2)
+  joinExpr (AppType y1 y2) = AppType (joinExpr y1) (joinExpr y2)
   joinExpr (LamType x y2) = LamType x (joinExpr y2)
 
 -- | Term.
